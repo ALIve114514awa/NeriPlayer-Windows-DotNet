@@ -2,48 +2,34 @@ using System.Text.RegularExpressions;
 
 namespace NeriPlayer.Core.Player.Model;
 
-/// <summary>
-/// 对标 StableKeyUtil / StableKeyByChannelId：生成不依赖具体平台 ID 的统一稳定键。
-/// </summary>
 public static partial class SongIdentity
 {
-    public static string StableKey(this SongItem item)
+    /// <summary>生成跨版本稳定的歌曲标识：去重、同步、持久化主键（对标 SongIdentity.kt）</summary>
+    public static string StableKey(this SongItem song)
     {
-        if (item.IsLocalSong())
-            return "local|" + NormalizePath(item.FilePath ?? string.Empty);
+        if (song.IsLocalSong())
+            return $"local|{NormalizePath(song.LocalFilePath ?? song.MediaUri ?? "")}";
 
-        switch (item.Platform)
+        return song.ChannelId switch
         {
-            case PlaybackSource.Netease:
-                return "netease|" + item.AudioId;
-            case PlaybackSource.Bilibili:
-                return "bilibili|" + item.AudioId + "|" + item.SubAudioId;
-            case PlaybackSource.YouTubeMusic:
-                var vid = !string.IsNullOrEmpty(item.VideoId)
-                    ? item.VideoId
-                    : ExtractYouTubeVideoId(item.AudioUrl ?? string.Empty);
-                return "ytm|" + (vid ?? item.AudioUrl ?? string.Empty);
-            default:
-                return (item.AudioUrl ?? string.Empty);
-        }
+            "netease" => $"netease|{song.AudioId ?? song.Id.ToString()}",
+            "bilibili" => $"bilibili|{song.AudioId}|{song.SubAudioId}",
+            "youtube_music" => $"ytm|{ExtractYouTubeVideoId(song.MediaUri)}",
+            _ => $"id|{song.Id}|{song.Album}|{song.MediaUri}"
+        };
     }
 
-    private static string NormalizePath(string path)
+    private static string NormalizePath(string p) =>
+        p.Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
+
+    /// <summary>从 YouTube 链接/播放列表 URI 提取视频 ID</summary>
+    public static string ExtractYouTubeVideoId(string? uri)
     {
-        return path
-            .Replace('\\', '/')
-            .TrimEnd('/')
-            .ToLowerInvariant();
+        if (string.IsNullOrEmpty(uri)) return "";
+        var m = YoutubeVideoIdRegex().Match(uri);
+        return m.Success ? m.Groups[1].Value : "";
     }
 
-    [GeneratedRegex(@"(?:[?&]v=|youtu\.be/|/shorts/)([A-Za-z0-9_-]{11})")]
-    private static partial Regex YouTubeVideoIdRegex();
-
-    private static string? ExtractYouTubeVideoId(string url)
-    {
-        var m = YouTubeVideoIdRegex().Match(url);
-        return m.Success ? m.Groups[1].Value : null;
-    }
-
-
+    [GeneratedRegex(@"(?:v=|youtu\.be/|/shorts/)([A-Za-z0-9_-]{11})")]
+    private static partial Regex YoutubeVideoIdRegex();
 }

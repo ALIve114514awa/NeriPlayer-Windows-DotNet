@@ -1,4 +1,5 @@
 using NeriPlayer.Core.Player.Model;
+using Xunit;
 
 namespace NeriPlayer.Core.Tests;
 
@@ -7,47 +8,36 @@ public class SongIdentityTests
     [Fact]
     public void LocalSong_StableKey_IsNormalizedPath()
     {
-        var item = new SongItem
+        var song = new SongItem
         {
-            Name = "test",
-            Artist = "a",
-            Album = "b",
-            Platform = PlaybackSource.Local,
-            FilePath = @"D:\Music\A\B\C.flac"
+            Id = 1, Name = "A", Artist = "B", Album = "C",
+            ChannelId = "local", LocalFilePath = @"D:\Music\a\b\c.flac"
         };
-
-        Assert.Equal("local|d:/music/a/b/c.flac", item.StableKey());
+        Assert.Equal("local|d:/music/a/b/c.flac", song.StableKey());
     }
 
     [Theory]
-    [InlineData("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ")]
-    [InlineData("https://youtu.be/dQw4w9WgXcQ?si=abc", "dQw4w9WgXcQ")]
-    public void YouTube_ExtractVideoId_Works(string url, string expected)
+    [InlineData("https://www.youtube.com/watch?v=abcDEF12345")]
+    [InlineData("https://youtu.be/abcDEF12345?si=xxx")]
+    public void YouTube_ExtractVideoId_Works(string uri)
     {
-        var item = new SongItem
+        var song = new SongItem
         {
-            Name = "x",
-            Artist = "y",
-            Album = "z",
-            Platform = PlaybackSource.YouTubeMusic,
-            AudioUrl = url   // 不设 VideoId，让 StableKey 走 URL 解析
+            Id = 2, Name = "A", Artist = "B", Album = "C",
+            ChannelId = "youtube_music", MediaUri = uri
         };
-
-        Assert.Contains(expected, item.StableKey());
+        Assert.Equal("abcDEF12345", SongIdentity.ExtractYouTubeVideoId(uri));
+        Assert.Equal("ytm|abcDEF12345", song.StableKey());
     }
 
     [Fact]
     public void Netease_StableKey_UsesAudioId()
     {
-        var item = new SongItem
+        var song = new SongItem
         {
-            Name = "晴天",
-            Artist = "周杰伦",
-            Album = "叶惠美",
-            Platform = PlaybackSource.Netease,
-            AudioId = "3456789"
+            Id = 9, Name = "A", Artist = "B", Album = "C",
+            ChannelId = "netease", AudioId = "3456789"
         };
-
-        Assert.Equal("netease|3456789", item.StableKey());
+        Assert.Equal("netease|3456789", song.StableKey());
     }
 }
